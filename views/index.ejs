@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文件管理</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    table,
+    th,
+    td {
+      border: 1px solid #ddd;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    .actions button {
+      margin-right: 5px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>文件管理</h1>
+
+  <h2>上传文件</h2>
+  <form id="uploadForm">
+    <input type="file" name="file" id="fileInput" required>
+    <button type="submit">上传</button>
+  </form>
+
+  <h2>文件列表</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>文件名</th>
+        <th>大小</th>
+        <th>上传时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="fileTableBody">
+      <!-- 文件列表 -->
+    </tbody>
+  </table>
+
+  <script>
+    const API_URL = "/api/files";
+
+    // 获取文件列表
+    async function fetchFileList() {
+      try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        const tbody = document.getElementById("fileTableBody");
+        tbody.innerHTML = data.files.map(file => `
+          <tr>
+            <td>${file.id}</td>
+            <td>${file.file_name}</td>
+            <td>${(file.file_size / 1024).toFixed(2)} KB</td>
+            <td>${file.created_at}</td>
+            <td class="actions">
+              <button onclick="downloadFile(${file.id}, '${file.file_name}')">下载</button>
+              <button onclick="deleteFile(${file.id})">删除</button>
+            </td>
+          </tr>
+        `).join("");
+      } catch (error) {
+        alert("无法加载文件列表！");
+        console.error(error);
+      }
+    }
+
+    // 文件上传处理
+    document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById("fileInput");
+      const formData = new FormData();
+	  console.log(fileInput.files[0].name)
+      formData.append("file_name", fileInput.files[0].name);
+      formData.append("file", fileInput.files[0]);
+
+      try {
+        const response = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
+        const result = await response.json();
+        if (result.errcode !== '0') {
+          alert(result.msg);
+        } else {
+        //   alert("文件上传成功！");
+          fetchFileList(); // 重新加载文件列表
+        }
+      } catch (error) {
+        alert("文件上传失败！");
+        console.error(error);
+      }
+    });
+
+    // 文件下载处理
+    async function downloadFile(id, file_name) {
+      try {
+        const response = await fetch(`${API_URL}/download/${id}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file_name;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        alert("下载失败！");
+        console.error(error);
+      }
+    }
+
+    // 删除文件
+    async function deleteFile(id) {
+      if (!confirm("确定删除该文件？")) return;
+      try {
+        const response = await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+        const result = await response.json();
+        if (result.errcode !== '0') {
+          alert(result.msg);
+        } else {
+          fetchFileList(); // 重新加载文件列表
+        }
+      } catch (error) {
+        alert("删除失败！");
+        console.error(error);
+      }
+    }
+
+    // 页面加载时获取文件列表
+    fetchFileList();
+  </script>
+</body>
+
+</html>
